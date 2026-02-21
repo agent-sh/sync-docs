@@ -1,0 +1,11 @@
+{
+  "agents": [
+    "sync-docs-agent"
+  ],
+  "skills": [
+    "sync-docs"
+  ],
+  "commands": [
+    "sync-docs"
+  ]
+}
