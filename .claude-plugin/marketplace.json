@@ -1,0 +1,22 @@
+{
+  "name": "sync-docs",
+  "description": "Standalone documentation sync: find outdated refs, update CHANGELOG, flag stale examples based on code changes",
+  "version": "1.0.0",
+  "owner": {
+    "name": "Avi Fenesh",
+    "url": "https://github.com/avifenesh"
+  },
+  "repository": "https://github.com/agent-sh/sync-docs",
+  "keywords": [
+    "sync-docs"
+  ],
+  "plugins": [
+    {
+      "name": "sync-docs",
+      "source": ".",
+      "description": "Standalone documentation sync: find outdated refs, update CHANGELOG, flag stale examples based on code changes",
+      "version": "1.0.0",
+      "category": "development"
+    }
+  ]
+}

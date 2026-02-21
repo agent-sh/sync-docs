@@ -1,0 +1,23 @@
+{
+  "name": "@agentsys/sync-docs",
+  "version": "1.0.0",
+  "description": "Sync documentation with code changes. Find outdated refs, update CHANGELOG, flag stale examples.",
+  "author": {
+    "name": "Avi Fenesh",
+    "email": "[email protected]",
+    "url": "https://github.com/avifenesh"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/agent-sh/sync-docs.git"
+  },
+  "homepage": "https://github.com/agent-sh/sync-docs",
+  "keywords": [
+    "documentation",
+    "changelog",
+    "sync",
+    "maintenance",
+    "code-docs"
+  ]
+}
