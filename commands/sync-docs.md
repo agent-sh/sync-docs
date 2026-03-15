@@ -54,7 +54,33 @@ const scope = scopeArg ? scopeArg.split('=')[1] : 'recent';
 const pathArg = args.find(a => !a.startsWith('--') && a !== 'report' && a !== 'apply');
 ```
 
-### Step 2: Spawn sync-docs-agent
+### Step 2: Pre-fetch repo-intel doc-drift data
+
+```javascript
+let repoIntelContext = '';
+try {
+  const { binary } = require('@agentsys/lib');
+  const fs = require('fs');
+  const path = require('path');
+  const cwd = process.cwd();
+  const stateDir = ['.claude', '.opencode', '.codex'].find(d => fs.existsSync(path.join(cwd, d))) || '.claude';
+  const mapFile = path.join(cwd, stateDir, 'repo-intel.json');
+
+  if (fs.existsSync(mapFile)) {
+    const docDrift = JSON.parse(binary.runAnalyzer(['repo-intel', 'query', 'doc-drift', '--top', '20', '--map-file', mapFile, cwd]));
+    if (docDrift.length > 0) {
+      const stale = docDrift.filter(d => d.codeCoupling === 0).map(d => d.path);
+      repoIntelContext = '\n\nRepo-intel doc-drift data (use this, do not re-scan):';
+      if (stale.length > 0) {
+        repoIntelContext += '\nDocs with ZERO code coupling (likely stale, check these first): ' + stale.join(', ');
+      }
+      repoIntelContext += '\nFull doc-drift data: ' + JSON.stringify(docDrift);
+    }
+  }
+} catch (e) { /* unavailable */ }
+```
+
+### Step 3: Spawn sync-docs-agent
 
 ```javascript
 const agentOutput = await Task({
@@ -65,11 +91,11 @@ Mode: ${mode}
 Scope: ${scope}
 ${pathArg ? `Path: ${pathArg}` : ''}
 
-Execute the sync-docs skill and return structured results.`
+Execute the sync-docs skill and return structured results.${repoIntelContext}`
 });
 ```
 
-### Step 3: Process Results
+### Step 4: Process Results
 
 Parse the structured JSON from between `=== SYNC_DOCS_RESULT ===` markers:
 
@@ -87,7 +113,7 @@ const result = parseSyncDocsResult(agentOutput);
 // result now contains: { mode, scope, validation, discovery, issues, fixes, changelog, summary }
 ```
 
-### Step 4: Apply Fixes (if apply mode)
+### Step 5: Apply Fixes (if apply mode)
 
 If mode is `apply` and fixes array is non-empty:
 
@@ -104,7 +130,7 @@ Use the Edit tool to apply each fix. Commit message: "docs: sync documentation w
 }
 ```
 
-### Step 5: Present Results
+### Step 6: Present Results
 
 ```markdown
 ## Documentation Sync ${mode === 'apply' ? 'Applied' : 'Report'}
