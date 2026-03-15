@@ -59,6 +59,14 @@ Invoke the sync-docs skill, which handles all phases:
 
 The skill does the heavy lifting. You orchestrate and format results.
 
+### 3.5. Use Doc-Drift Signals (if available)
+
+When the collector output includes a `docDrift` array (from agent-analyzer's `doc-drift` query), use it as an additional signal for prioritizing documentation updates. Each entry has `path`, `codeCoupling`, `lastChanged`, and `changes`.
+
+- Docs with `codeCoupling: 0` have **never** co-changed with code - treat them as likely stale and prioritize reviewing them.
+- Low `codeCoupling` combined with old `lastChanged` is a strong indicator the doc has drifted from the code.
+- This data is optional - if `docDrift` is `null`, skip this step.
+
 ### 4. Parse and Format Output
 
 Output structured JSON between markers:

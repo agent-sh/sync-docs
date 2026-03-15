@@ -49,6 +49,11 @@ git ls-files '*.md'
 - Find exports not mentioned in any documentation
 - Report as `undocumented-export` issues
 
+**Step 6**: If `{stateDir}/repo-intel.json` exists, run doc-drift query to find docs with low code coupling:
+- Docs with `codeCoupling: 0` never co-change with code and are likely stale
+- Include results under `docDrift` key in output
+- This step is optional - if agent-analyzer binary is unavailable, skip silently
+
 ## Input
 
 Arguments: `[report|apply] [--scope=all|recent|before-pr] [--include-undocumented]`
@@ -283,6 +288,14 @@ Combine all results into a single output:
       "line": 25,
       "certainty": "MEDIUM",
       "suggestion": "Export 'formatDate' in src/utils.js is not mentioned in any documentation"
+    }
+  ],
+  "docDrift": [
+    {
+      "path": "README.md",
+      "codeCoupling": 0,
+      "lastChanged": "2026-01-15T10:00:00Z",
+      "changes": 5
     }
   ],
   "fixes": [
