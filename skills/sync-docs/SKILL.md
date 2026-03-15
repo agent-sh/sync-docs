@@ -21,6 +21,45 @@ const includeUndocumented = args.includes('--include-undocumented');
 
 ## Quick Start - Agent Instructions
 
+### Pre-check: Ensure Repo-Intel
+
+Before starting analysis, check if the repo-intel map exists:
+
+```javascript
+const fs = require('fs');
+const path = require('path');
+
+const cwd = process.cwd();
+const stateDir = ['.claude', '.opencode', '.codex']
+  .find(d => fs.existsSync(path.join(cwd, d))) || '.claude';
+const mapFile = path.join(cwd, stateDir, 'repo-intel.json');
+
+if (!fs.existsSync(mapFile)) {
+  const response = await AskUserQuestion({
+    questions: [{
+      question: 'Generate repo-intel?',
+      description: 'No repo-intel map found. Generating one enables doc-drift detection (identifies stale docs by code coupling). Takes ~5 seconds.',
+      options: [
+        { label: 'Yes, generate it', value: 'yes' },
+        { label: 'Skip', value: 'no' }
+      ]
+    }]
+  });
+
+  if (response === 'yes' || response?.['Generate repo-intel?'] === 'yes') {
+    try {
+      const { binary } = require('@agentsys/lib');
+      const output = binary.runAnalyzer(['repo-intel', 'init', cwd]);
+      const stateDirPath = path.join(cwd, stateDir);
+      if (!fs.existsSync(stateDirPath)) fs.mkdirSync(stateDirPath, { recursive: true });
+      fs.writeFileSync(mapFile, output);
+    } catch (e) {
+      // Binary not available - proceed without
+    }
+  }
+}
+```
+
 **Step 1**: Get changed files (use Bash):
 ```bash
 # Recent changes (default scope)
