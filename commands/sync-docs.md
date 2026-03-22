@@ -54,27 +54,40 @@ const scope = scopeArg ? scopeArg.split('=')[1] : 'recent';
 const pathArg = args.find(a => !a.startsWith('--') && a !== 'report' && a !== 'apply');
 ```
 
-### Step 2: Pre-fetch repo-intel doc-drift data
+### Step 2: Pre-fetch repo-intel doc analysis data
 
 ```javascript
 let repoIntelContext = '';
 try {
   const { binary } = require('@agentsys/lib');
+  const { getStateDirPath } = require('@agentsys/lib/platform/state-dir');
   const fs = require('fs');
-  const path = require('path');
   const cwd = process.cwd();
-  const stateDir = ['.claude', '.opencode', '.codex'].find(d => fs.existsSync(path.join(cwd, d))) || '.claude';
-  const mapFile = path.join(cwd, stateDir, 'repo-intel.json');
+  const mapFile = require('path').join(getStateDirPath(cwd), 'repo-intel.json');
+  const q = (args) => { try { return JSON.parse(binary.runAnalyzer(args)); } catch { return null; } };
 
   if (fs.existsSync(mapFile)) {
-    const docDrift = JSON.parse(binary.runAnalyzer(['repo-intel', 'query', 'doc-drift', '--top', '20', '--map-file', mapFile, cwd]));
-    if (docDrift.length > 0) {
-      const stale = docDrift.filter(d => d.codeCoupling === 0).map(d => d.path);
-      repoIntelContext = '\n\nRepo-intel doc-drift data (use this, do not re-scan):';
-      if (stale.length > 0) {
-        repoIntelContext += '\nDocs with ZERO code coupling (likely stale, check these first): ' + stale.join(', ');
+    // Symbol-level stale doc references (Phase 4 - most precise)
+    const staleDocs = q(['repo-intel', 'query', 'stale-docs', '--top', '30', '--map-file', mapFile, cwd]);
+    // Heuristic doc-drift (Phase 1 - coupling-based)
+    const docDrift = q(['repo-intel', 'query', 'doc-drift', '--top', '20', '--map-file', mapFile, cwd]);
+
+    if ((staleDocs && staleDocs.length > 0) || (docDrift && docDrift.length > 0)) {
+      repoIntelContext = '\n\nRepo-intel doc analysis (use this data, do NOT re-scan):';
+
+      if (staleDocs && staleDocs.length > 0) {
+        repoIntelContext += '\n\nStale doc references (symbol-level - highest priority):';
+        staleDocs.forEach(s => {
+          repoIntelContext += `\n  ${s.doc}:${s.line} "${s.reference}" [${s.issue}] ${s.suggestion}`;
+        });
       }
-      repoIntelContext += '\nFull doc-drift data: ' + JSON.stringify(docDrift);
+
+      if (docDrift && docDrift.length > 0) {
+        const severelyStale = docDrift.filter(d => d.codeCoupling === 0).map(d => d.path);
+        if (severelyStale.length > 0) {
+          repoIntelContext += '\n\nDocs with ZERO code coupling (likely entirely stale): ' + severelyStale.join(', ');
+        }
+      }
     }
   }
 } catch (e) { /* unavailable */ }
