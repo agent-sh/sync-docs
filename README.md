@@ -63,7 +63,7 @@ sync-docs runs a multi-phase analysis pipeline:
 - Removed exports still referenced in documentation
 - Code examples that may use outdated function signatures
 - Import path changes across docs
-- Undocumented exports (when repo-map data is available)
+- Undocumented exports (when repo-intel data is available)
 
 ## Usage
 
@@ -96,7 +96,7 @@ Applies safe fixes (version updates, CHANGELOG entries) and reports remaining is
 ### Additional Flags
 
 ```bash
-/sync-docs --include-undocumented    # Find exports with no doc coverage (uses repo-map)
+/sync-docs --include-undocumented    # Find exports with no doc coverage (uses repo-intel)
 ```
 
 ## Requirements
@@ -104,13 +104,13 @@ Applies safe fixes (version updates, CHANGELOG entries) and reports remaining is
 - Git (required for change detection)
 - Node.js
 - [agentsys](https://github.com/agent-sh/agentsys) runtime
-- ast-grep (optional, enables accurate export detection via repo-map)
+- ast-grep (optional, enables accurate export detection via repo-intel)
 
 ## Related Plugins
 
 - [next-task](https://github.com/agent-sh/next-task) - invokes sync-docs in Phase 11 before PR creation
 - [drift-detect](https://github.com/agent-sh/drift-detect) - compares project plans vs implementation
-- [repo-map](https://github.com/agent-sh/repo-map) - provides export data for undocumented-export detection
+- [repo-intel](https://github.com/agent-sh/repo-intel) - provides export data for undocumented-export detection
 
 ## License
 
