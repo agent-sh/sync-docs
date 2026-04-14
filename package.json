@@ -19,5 +19,9 @@
     "sync",
     "maintenance",
     "code-docs"
-  ]
+  ],
+  "scripts": {
+    "test": "node -e \"require('./lib')\"",
+    "validate": "node -e \"require('./lib')\""
+  }
 }
