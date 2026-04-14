@@ -83,7 +83,7 @@ git ls-files '*.md'
 - Look for `## [Unreleased]` section
 - Compare recent commit messages to CHANGELOG entries
 
-**Step 5**: If repo-intel exists (`{stateDir}/repo-intel.json` - platform state directory):
+**Step 5**: If repo-map exists (`{stateDir}/repo-map.json` - platform state directory):
 - Load it to get accurate export list
 - Find exports not mentioned in any documentation
 - Report as `undocumented-export` issues
