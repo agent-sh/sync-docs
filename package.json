@@ -2,6 +2,9 @@
   "name": "@agentsys/sync-docs",
   "version": "1.0.0",
   "description": "Sync documentation with code changes. Find outdated refs, update CHANGELOG, flag stale examples.",
+  "scripts": {
+    "test": "node --test tests/**/*.test.js"
+  },
   "author": {
     "name": "Avi Fenesh",
     "email": "[email protected]",

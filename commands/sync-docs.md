@@ -59,18 +59,21 @@ const pathArg = args.find(a => !a.startsWith('--') && a !== 'report' && a !== 'a
 ```javascript
 let repoIntelContext = '';
 try {
-  const { binary } = require('@agentsys/lib');
-  const { getStateDirPath } = require('@agentsys/lib/platform/state-dir');
+  const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT;
+  if (!pluginRoot) throw new Error('CLAUDE_PLUGIN_ROOT not set');
+  const { repoIntel, libRoot } = require(`${pluginRoot}/lib/agentsys`).get();
+  if (!repoIntel) throw new Error('agentsys is older than v5.8.6 (typed repo-intel queries unavailable) - run `/plugin marketplace update` to enable');
+  const { getStateDirPath } = require(`${libRoot}/platform/state-dir`);
   const fs = require('fs');
+  const path = require('path');
   const cwd = process.cwd();
-  const mapFile = require('path').join(getStateDirPath(cwd), 'repo-intel.json');
-  const q = (args) => { try { return JSON.parse(binary.runAnalyzer(args)); } catch { return null; } };
+  const mapFile = path.join(getStateDirPath(cwd), 'repo-intel.json');
 
   if (fs.existsSync(mapFile)) {
     // Symbol-level stale doc references (Phase 4 - most precise)
-    const staleDocs = q(['repo-intel', 'query', 'stale-docs', '--top', '30', '--map-file', mapFile, cwd]);
+    const staleDocs = repoIntel.queries.staleDocs(cwd, { limit: 30 });
     // Heuristic doc-drift (Phase 1 - coupling-based)
-    const docDrift = q(['repo-intel', 'query', 'doc-drift', '--top', '20', '--map-file', mapFile, cwd]);
+    const docDrift = repoIntel.queries.docDrift(cwd, { limit: 20 });
 
     if ((staleDocs && staleDocs.length > 0) || (docDrift && docDrift.length > 0)) {
       repoIntelContext = '\n\nRepo-intel doc analysis (use this data, do NOT re-scan):';
@@ -90,7 +93,10 @@ try {
       }
     }
   }
-} catch (e) { /* unavailable */ }
+} catch (e) {
+  // Surface the skip reason instead of swallowing silently.
+  console.error(`[INFO] repo-intel doc context skipped: ${e.message}`);
+}
 ```
 
 ### Step 3: Spawn sync-docs-agent
