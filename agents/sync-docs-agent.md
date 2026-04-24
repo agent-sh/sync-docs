@@ -104,6 +104,7 @@ Analyzed 5 changed files, found 3 related docs.
 [CRITICAL] 1 doc(s) reference dead (orphan-export) code - actively misleading
 [WARN] 2 doc(s) describe single-call passthrough wrappers
 [INFO] 1 doc(s) have zero code coupling (likely stale)
+[INFO] 4 undocumented export(s) in changed files
 
 ### CHANGELOG Status
 [WARN] 3 commits may need entries
@@ -112,7 +113,7 @@ Analyzed 5 changed files, found 3 related docs.
 2 fixes ready for simple-fixer
 ```
 
-Omit any `### Analyzer Findings` line whose count is zero. If `analyzer.available === false`, replace the whole block with a single line: `[INFO] analyzer unavailable (${analyzer.reason}) - skipped stale-docs / doc-drift / slop cross-checks`.
+Omit any `### Analyzer Findings` line whose count is zero. If `analyzer.available === false`, replace the whole block with a single line: `[INFO] analyzer unavailable (${analyzer.reason}) - skipped stale-docs / doc-drift / slop cross-checks / undocumented-exports checks`.
 
 ## Completion criterion
 
