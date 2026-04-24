@@ -67,9 +67,14 @@ try {
   const q = (args) => { try { return JSON.parse(binary.runAnalyzer(args)); } catch { return null; } };
 
   if (fs.existsSync(mapFile)) {
-    // Symbol-level stale doc references (Phase 4 - most precise)
+    // Light pre-fetch so the orchestrator can decide whether to
+    // surface an "analyzer signals available" hint before spawning
+    // the agent. The actual signal consumption happens inside the
+    // skill via lib/collectors/analyzer-queries, which pulls the
+    // full four-query bundle (stale-docs, doc-drift, entry-points,
+    // slop-fixes). We only need presence signals here to avoid
+    // double-fetching the same data into the prompt.
     const staleDocs = q(['repo-intel', 'query', 'stale-docs', '--top', '30', '--map-file', mapFile, cwd]);
-    // Heuristic doc-drift (Phase 1 - coupling-based)
     const docDrift = q(['repo-intel', 'query', 'doc-drift', '--top', '20', '--map-file', mapFile, cwd]);
 
     if ((staleDocs && staleDocs.length > 0) || (docDrift && docDrift.length > 0)) {
@@ -89,6 +94,12 @@ try {
         }
       }
     }
+    // Note: entry-points + slop-fixes (orphan-export,
+    // passthrough-wrapper) are fetched inside the skill via
+    // lib/collectors/analyzer-queries and surfaced in the skill's
+    // JSON output as `undocumentedExports`, `documentsDeadCode`,
+    // and `documentsWrapper`. Not pre-fetched here to avoid
+    // duplicating analyzer calls across the command + skill path.
   }
 } catch (e) { /* unavailable */ }
 ```
