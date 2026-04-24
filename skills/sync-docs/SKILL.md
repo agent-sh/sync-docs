@@ -83,7 +83,7 @@ git ls-files '*.md'
 - Look for `## [Unreleased]` section
 - Compare recent commit messages to CHANGELOG entries
 
-**Step 5**: If repo-map exists (`{stateDir}/repo-map.json`):
+**Step 5**: If the repo-intel artifact exists (`{stateDir}/repo-intel.json`):
 - Load it to get accurate export list for `undocumented-export` detection
 - Filter through the analyzer's `entry-points` query so Cargo `[[bin]]`
   targets, `main()` functions, and framework-loaded configs aren't flagged

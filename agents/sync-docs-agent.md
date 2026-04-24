@@ -8,7 +8,6 @@ tools:
   - Read
   - Glob
   - Grep
-  - Edit
 model: sonnet
 ---
 
@@ -37,7 +36,7 @@ The skill owns all data collection: git diff → related docs → analyzer queri
 
 ### 3. Interpret analyzer signals
 
-The skill's output may include four analyzer-sourced fields. If the `agent-analyzer` binary or `repo-intel.json` was unavailable at skill-run time, each field is empty/null — skip the corresponding check silently.
+The skill's output may include five analyzer-sourced fields (`issues` entries tagged `analyzer-stale-docs`, plus `documentsDeadCode`, `documentsWrapper`, `docDrift`, `undocumentedExports`). If the `agent-analyzer` binary or `repo-intel.json` was unavailable at skill-run time, each field is empty/null — skip the corresponding check silently.
 
 **`issues` entries with `detectionMethod: "analyzer-stale-docs"`** — per-doc per-line findings from the analyzer's symbol table where a referenced code symbol no longer exists. Lifted from the `stale-docs` query, so renames and deletions are handled correctly. Treat `severity: "high"` (issue `symbol-not-found`) as actionable: the doc either needs to be updated to the new symbol name or the reference needs to be removed.
 
@@ -130,6 +129,7 @@ You are done only when you have emitted BOTH the `=== SYNC_DOCS_RESULT ===` mark
 {
   "mode": "report",
   "scope": "recent",
+  "validation": { "counts": { "status": "ok" }, "crossPlatform": { "status": "ok" } },
   "discovery": { "changedFilesCount": 3, "relatedDocsCount": 1, "relatedDocs": [{"doc":"README.md","referencedFile":"src/auth.rs"}] },
   "issues": [],
   "undocumentedExports": [],
@@ -169,7 +169,7 @@ Analyzed 3 changed files, found 1 related doc.
 [OK] No documentation issues detected
 
 ### Analyzer Findings
-[INFO] analyzer unavailable (analyzer-binary-unavailable) - skipped stale-docs / doc-drift / slop cross-checks
+[INFO] analyzer unavailable (analyzer-binary-unavailable) - skipped stale-docs / doc-drift / slop cross-checks / undocumented-exports checks
 
 ### CHANGELOG Status
 [OK] All changes documented

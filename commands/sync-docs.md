@@ -71,8 +71,23 @@ try {
     const staleDocs = q(['repo-intel', 'query', 'stale-docs', '--top', '30', '--map-file', mapFile, cwd]);
     // Heuristic doc-drift (Phase 1 - coupling-based)
     const docDrift = q(['repo-intel', 'query', 'doc-drift', '--top', '20', '--map-file', mapFile, cwd]);
+    // Entry-points (to filter undocumented-export false positives)
+    const epRaw = q(['repo-intel', 'query', 'entry-points', '--map-file', mapFile, cwd]);
+    const entryPoints = Array.isArray(epRaw) ? epRaw : (epRaw?.entryPoints || []);
+    // Slop-fixes: just the two categories that the sync-docs agent
+    // surfaces as documents-dead-code / documents-wrapper findings.
+    const slopRaw = q(['repo-intel', 'query', 'slop-fixes', '--map-file', mapFile, cwd]);
+    const slopFixes = Array.isArray(slopRaw) ? slopRaw : (slopRaw?.fixes || []);
+    const orphanExports = slopFixes.filter(f => f.category === 'orphan-export').slice(0, 20);
+    const passthroughWrappers = slopFixes.filter(f => f.category === 'passthrough-wrapper').slice(0, 20);
 
-    if ((staleDocs && staleDocs.length > 0) || (docDrift && docDrift.length > 0)) {
+    const hasAny = (staleDocs?.length || 0) > 0
+      || (docDrift?.length || 0) > 0
+      || entryPoints.length > 0
+      || orphanExports.length > 0
+      || passthroughWrappers.length > 0;
+
+    if (hasAny) {
       repoIntelContext = '\n\nRepo-intel doc analysis (use this data, do NOT re-scan):';
 
       if (staleDocs && staleDocs.length > 0) {
@@ -87,6 +102,18 @@ try {
         if (severelyStale.length > 0) {
           repoIntelContext += '\n\nDocs with ZERO code coupling (likely entirely stale): ' + severelyStale.join(', ');
         }
+      }
+
+      if (entryPoints.length > 0) {
+        repoIntelContext += '\n\nEntry points (Cargo [[bin]] / main() / framework configs — these are execution surfaces; do NOT flag their exports as "missing prose docs"):\n' + JSON.stringify(entryPoints.slice(0, 30), null, 2);
+      }
+
+      if (orphanExports.length > 0) {
+        repoIntelContext += '\n\nOrphan exports (symbols proved unused; if any doc mentions these names, surface as documents-dead-code):\n' + JSON.stringify(orphanExports, null, 2);
+      }
+
+      if (passthroughWrappers.length > 0) {
+        repoIntelContext += '\n\nPassthrough wrappers (single-call delegation; if any doc describes these as having distinct behavior, surface as documents-wrapper):\n' + JSON.stringify(passthroughWrappers, null, 2);
       }
     }
   }
