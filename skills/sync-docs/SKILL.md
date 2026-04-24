@@ -83,15 +83,28 @@ git ls-files '*.md'
 - Look for `## [Unreleased]` section
 - Compare recent commit messages to CHANGELOG entries
 
-**Step 5**: If repo-map exists (`{stateDir}/repo-map.json` - platform state directory):
-- Load it to get accurate export list
-- Find exports not mentioned in any documentation
-- Report as `undocumented-export` issues
+**Step 5**: If repo-map exists (`{stateDir}/repo-map.json`):
+- Load it to get accurate export list for `undocumented-export` detection
+- Filter through the analyzer's `entry-points` query so Cargo `[[bin]]`
+  targets, `main()` functions, and framework-loaded configs aren't flagged
+  as missing prose docs (they're execution surfaces, not library APIs)
 
-**Step 6**: If `{stateDir}/repo-intel.json` exists, run doc-drift query to find docs with low code coupling:
-- Docs with `codeCoupling: 0` never co-change with code and are likely stale
-- Include results under `docDrift` key in output
-- This step is optional - if agent-analyzer binary is unavailable, skip silently
+**Step 6**: Load analyzer signals in one batch via `lib/collectors/analyzer-queries`:
+- `stale-docs` — per-doc per-line findings where a referenced symbol no
+  longer exists (rename/deletion-aware). Lifted directly as `removed-export`
+  issues rather than re-derived from `git show HEAD~1` diffs.
+- `doc-drift` — docs with low code coupling, pre-filtered to exclude
+  `versioned_docs/`, `tests/fixtures/`, `generated/`, and append-only
+  `CHANGELOG.md` (where low coupling is by design, not drift).
+- `slop-fixes` — when a doc mentions a symbol the analyzer has proved is
+  dead (`orphan-export`) or is a single-call wrapper
+  (`passthrough-wrapper`), surface as `documents-dead-code` /
+  `documents-wrapper` with high/medium severity respectively.
+
+If the `agent-analyzer` binary or `repo-intel.json` is missing, the bundle
+is marked `available: false` and all analyzer-sourced checks return empty
+arrays. No silent regex fallback — better to report zero findings than to
+invent bad ones.
 
 ## Input
 
@@ -240,14 +253,24 @@ const relatedDocs = docsPatterns.findRelatedDocs(changedFiles.split('\n').filter
 
 ## Phase 3: Analyze Documentation Issues
 
-For each related doc, check for issues:
+Load the analyzer bundle once and thread it through. All analyzer queries
+(`stale-docs`, `doc-drift`, `entry-points`, `slop-fixes`) run in a single
+batch; downstream analysis reads from the indexed maps rather than
+shelling out per doc.
 
 ```javascript
+const analyzer = analyzerQueries.collect({
+  cwd: process.cwd(),
+  staleDocsTop: 1500,   // bump for large repos; default 500
+  docDriftTop: 50
+});
+
 const allIssues = [];
 
 for (const { doc, referencedFile } of relatedDocs) {
   const issues = docsPatterns.analyzeDocIssues(doc, referencedFile, {
-    cwd: process.cwd()
+    cwd: process.cwd(),
+    analyzer       // lifts per-doc entries from analyzer.staleDocsByDoc
   });
 
   issues.forEach(issue => {
@@ -337,6 +360,34 @@ Combine all results into a single output:
       "changes": 5
     }
   ],
+  "documentsDeadCode": [
+    {
+      "type": "documents-dead-code",
+      "severity": "high",
+      "doc": "README.md",
+      "reference": "legacyHandler",
+      "file": "src/legacy.js",
+      "certainty": "HIGH",
+      "suggestion": "'legacyHandler' is documented but the analyzer proves it is unused - remove the doc mention or inline the code"
+    }
+  ],
+  "documentsWrapper": [
+    {
+      "type": "documents-wrapper",
+      "severity": "medium",
+      "doc": "docs/api.md",
+      "reference": "getUser",
+      "file": "src/api/users.rs",
+      "certainty": "MEDIUM",
+      "suggestion": "'getUser' is documented but is a single-call passthrough - describe the underlying call or inline the wrapper"
+    }
+  ],
+  "analyzer": {
+    "available": true,
+    "reason": null,
+    "mapFile": ".claude/repo-intel.json",
+    "counts": { "staleDocs": 42, "docDriftFiltered": 8, "entryPoints": 12, "orphanExports": 3, "passthroughWrappers": 1 }
+  },
   "fixes": [
     {
       "file": "README.md",
