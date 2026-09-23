@@ -78,6 +78,48 @@ test('branch scope finds an export removed before the last commit, skips the cha
   }
 });
 
+test('changelog coverage only counts commits in the branch range', () => {
+  const dir = repo();
+  try {
+    // A feat commit on main before the branch point must not count.
+    execFileSync('git', ['checkout', '-q', 'main'], { cwd: dir });
+    fs.writeFileSync(path.join(dir, 'x.js'), '1');
+    execFileSync('git', ['add', '.'], { cwd: dir });
+    execFileSync('git', ['commit', '-q', '-m', 'feat: old released thing'], { cwd: dir });
+    execFileSync('git', ['checkout', '-q', 'feature'], { cwd: dir });
+    execFileSync('git', ['rebase', '-q', 'main'], { cwd: dir });
+    const r = collect({ scope: 'before-pr', base: 'main' }, dir);
+    assert.deepStrictEqual(r.changelog.undocumented, ['feat: drop parseThing']);
+    fs.appendFileSync(path.join(dir, 'CHANGELOG.md'), '- drop parseThing\n');
+    const r2 = collect({ scope: 'before-pr', base: 'main' }, dir);
+    assert.strictEqual(r2.changelog.status, 'ok');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('a removed export named like a plain word only counts in code', () => {
+  const dir = repo();
+  try {
+    const w = (f, c) => fs.writeFileSync(path.join(dir, f), c);
+    w('src/cfg.js', 'function config() {}\nmodule.exports = { config };\n');
+    w('README.md', '# x\n\nThe config lives in a file.\n');
+    execFileSync('git', ['add', '.'], { cwd: dir });
+    execFileSync('git', ['commit', '-q', '-m', 'chore: cfg'], { cwd: dir });
+    execFileSync('git', ['update-ref', 'refs/heads/main', 'HEAD'], { cwd: dir });
+    w('src/cfg.js', 'module.exports = {};\n');
+    execFileSync('git', ['commit', '-q', '-am', 'fix: drop config'], { cwd: dir });
+    let r = collect({ scope: 'before-pr', base: 'main' }, dir);
+    assert.ok(!r.issues.some(i => i.reference === 'config'), 'prose "config" is not a stale reference');
+    w('README.md', '# x\n\nCall `config()` first.\n');
+    r = collect({ scope: 'before-pr', base: 'main' }, dir);
+    const hit = r.issues.find(i => i.reference === 'config');
+    assert.strictEqual(hit && hit.certainty, 'HIGH');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('a dotfile with no basename does not match every code example', () => {
   const dir = repo();
   try {

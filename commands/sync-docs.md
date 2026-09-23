@@ -2,7 +2,7 @@
 description: Use when user asks to "update docs", "sync documentation", "fix outdated docs", "update changelog", "docs are stale", or after completing code changes that might affect documentation.
 codex-description: 'Use when user asks to "update docs", "sync documentation", "fix outdated docs", "refresh README". Compares documentation to actual code and fixes discrepancies.'
 argument-hint: "[report|apply] [--scope=recent|all|before-pr] [--base=BRANCH] [--include-undocumented] [path]"
-allowed-tools: Task, Skill, Read, Edit, Glob, Grep, Bash(git:*), Bash(node:*), AskUserQuestion
+allowed-tools: Task, Read, Edit, Glob, Grep, Bash(git:*), Bash(node:*), AskUserQuestion
 ---
 
 # /sync-docs
@@ -17,7 +17,7 @@ Arguments: `$ARGUMENTS`
 
 ## Run
 
-Spawn `sync-docs:sync-docs-agent` with `Mode`, `Scope`, and the base or path. If Task is not available, load the `sync-docs` skill (or read this plugin's `skills/sync-docs/SKILL.md`) and run it inline. Either way the result ends with a `=== SYNC_DOCS_RESULT ===` block. Its JSON is nested; if you process it as data, parse it as JSON, not with a regex.
+Spawn `sync-docs:sync-docs-agent` with `Mode`, `Scope`, and the base or path. If Task is not available, read this plugin's `skills/sync-docs/SKILL.md` and run it inline (not through the Skill tool: `Skill(sync-docs)` resolves to this command). Either way the result ends with a `=== SYNC_DOCS_RESULT ===` block. Its JSON is nested; if you process it as data, parse it as JSON, not with a regex.
 
 ## Apply
 

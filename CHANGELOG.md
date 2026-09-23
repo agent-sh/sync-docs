@@ -23,6 +23,9 @@
 - A changed dotfile (`.gitmodules`, `.gitignore`) has an empty basename and matched every code example in every doc.
 - The command parsed SYNC_DOCS_RESULT with a lazy regex (`{[\s\S]*?}`) that stops at the first `}`, so any result with nested objects failed.
 - A path scope passed as `--scope=src/api` (the form the prompts document) was ignored: the collector ran the branch diff and labeled it with the path. Found by revuto. Both `--scope=<path>` and a bare path work now.
+- CHANGELOG coverage looked at the last 10 commits on HEAD whatever the scope, so on a short branch it flagged released base-branch commits and apply mode drafted entries for them. It now checks the commits in the scope's range, including conventional scopes like `feat(api):`. Found by revuto.
+- A removed export named like a plain word (`config`) matched every sentence using it, as HIGH certainty. Code mentions are HIGH; prose mentions count only for identifier-shaped names, as MEDIUM. Found by revuto.
+- The agent loaded the skill with `Skill(sync-docs)`, which resolves to the `/sync-docs` command and spawns the agent again. It reads the skill file now.
 - The report printed `validation.counts` and `validation.crossPlatform`, which nothing computed. Dropped.
 
 

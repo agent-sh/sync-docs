@@ -4,7 +4,6 @@ description: Compare documentation with the code on a branch or scope and return
 tools:
   - Bash(git:*)
   - Bash(node:*)
-  - Skill
   - Read
   - Glob
   - Grep
@@ -17,7 +16,7 @@ You check whether the docs still match the code. The caller passes `Mode` (`repo
 
 Runs on Sonnet: the work is running a collector and checking each lead against a doc line and the code, which a fast tier does well.
 
-Load the `sync-docs` skill with `<mode> --scope=<scope>` (plus `--base=<base>` or the path) and follow it. If the Skill tool is missing, read this plugin's `skills/sync-docs/SKILL.md`.
+Read this plugin's `skills/sync-docs/SKILL.md` and follow it with `<mode> --scope=<scope>` (plus `--base=<base>` or the path). Do not load it with the Skill tool: the skill shares its name with the `/sync-docs` command, so `Skill(sync-docs)` loads the command, which spawns this agent again.
 
 ## Constraints
 

@@ -141,6 +141,44 @@ function lineOf(content, needle) {
   return i === -1 ? null : content.slice(0, i).split('\n').length;
 }
 
+// camelCase, snake_case, PascalCase with an inner capital, or a digit: not an English word.
+const IDENTIFIER_SHAPED = /[a-z][A-Z]|_|\d|^[A-Z][a-z]+[A-Z]/;
+
+function mentionsInCode(content, name) {
+  const word = new RegExp(`\\b${escapeRegex(name)}\\b`);
+  for (const m of content.matchAll(/```[\s\S]*?```|`[^`\n]+`/g)) {
+    if (word.test(m[0])) return true;
+  }
+  return false;
+}
+
+// feat/fix/breaking commits in the scope whose subject or short hash the changelog does not mention.
+function changelogCoverage(cwd, since) {
+  const file = ['CHANGELOG.md', 'CHANGES.md', 'HISTORY.md'].map(f => path.join(cwd, f)).find(f => fs.existsSync(f));
+  if (!file) return { exists: false, status: 'missing', range: null, undocumented: [] };
+  const text = fs.readFileSync(file, 'utf8');
+  const range = since ? `${since}..HEAD` : null;
+  const log = git(['log', '--no-merges', '--format=%h%x09%s', ...(range ? [range] : ['-10'])], cwd) || '';
+  const documented = [];
+  const undocumented = [];
+  for (const line of lines(log)) {
+    const [hash, subject = ''] = line.split('\t');
+    if (!/^(feat|fix|perf|breaking)(\([^)]*\))?!?:|BREAKING CHANGE/i.test(subject)) continue;
+    const description = subject.replace(/^[a-z]+(\([^)]*\))?!?:\s*/i, '');
+    if (text.includes(subject) || text.includes(description) || text.includes(hash)) documented.push(subject);
+    else undocumented.push(subject);
+  }
+  return {
+    exists: true,
+    file: path.relative(cwd, file),
+    hasUnreleased: /^##\s*\[?Unreleased\]?/mi.test(text),
+    range: range || 'last 10 commits',
+    documented,
+    undocumented,
+    status: undocumented.length ? 'needs-update' : 'ok'
+  };
+}
+
 // CHANGELOG entries describe history: a removed symbol there is a record, not a stale doc.
 const HISTORY_DOC = /(^|\/)(CHANGELOG|HISTORY|RELEASES?)\.md$/i;
 
@@ -229,13 +267,17 @@ function collect(opts, cwd = process.cwd()) {
       if (!before.length) continue;
       const after = exportsAt(file, 'HEAD', cwd);
       for (const name of before.filter(e => !after.includes(e) && e.length >= 4)) {
-        const re = new RegExp(`\\b${escapeRegex(name)}\\b`);
+        const word = new RegExp(`\\b${escapeRegex(name)}\\b`);
         for (const doc of liveDocs) {
           const content = docs.content.get(doc);
-          if (!content || !re.test(content)) continue;
+          if (!content || !word.test(content)) continue;
+          // A code mention is a reference; `config` in a sentence is usually just a word.
+          const inCode = mentionsInCode(content, name);
+          if (!inCode && !IDENTIFIER_SHAPED.test(name)) continue;
           push({
-            type: 'removed-export', severity: 'high', doc, line: lineOf(content, re), reference: name,
-            referencedFile: file, detectionMethod: 'git', certainty: 'HIGH', suggestion: `'${name}' was removed or renamed in ${file}`
+            type: 'removed-export', severity: inCode ? 'high' : 'medium', doc, line: lineOf(content, word), reference: name,
+            referencedFile: file, detectionMethod: 'git', certainty: inCode ? 'HIGH' : 'MEDIUM',
+            suggestion: `'${name}' was removed or renamed in ${file}`
           });
         }
       }
@@ -274,8 +316,8 @@ function collect(opts, cwd = process.cwd()) {
       n => `'${n}' is documented but is a single-call passthrough - describe the underlying call`)
     : [];
 
-  const changelog = docsPatterns.checkChangelog(sourceFiles, { cwd });
-  changelog.status = !changelog.exists ? 'missing' : (changelog.undocumented || []).length ? 'needs-update' : 'ok';
+  // Only commits in the scope: base-branch history was released long ago.
+  const changelog = changelogCoverage(cwd, scope.since);
 
   const bySeverity = { high: 0, medium: 0, low: 0 };
   for (const i of [...issues, ...documentsDeadCode, ...documentsWrapper, ...undocumentedExports]) {
