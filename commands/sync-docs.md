@@ -1,236 +1,57 @@
 ---
 description: Use when user asks to "update docs", "sync documentation", "fix outdated docs", "update changelog", "docs are stale", or after completing code changes that might affect documentation.
 codex-description: 'Use when user asks to "update docs", "sync documentation", "fix outdated docs", "refresh README". Compares documentation to actual code and fixes discrepancies.'
-argument-hint: "[report|apply] [--scope=recent|all|before-pr] [path]"
+argument-hint: "[report|apply] [--scope=recent|all|before-pr] [--base=BRANCH] [--include-undocumented] [path]"
+allowed-tools: Task, Read, Edit, Glob, Grep, Bash(git:*), Bash(node:*), AskUserQuestion
 ---
 
-# /sync-docs - Documentation Sync
+# /sync-docs
 
-Sync documentation with actual code state. Finds docs that reference changed files, updates CHANGELOG, and flags outdated examples.
+Find docs that no longer match the code. In `apply` mode, fix them and commit.
 
-## Architecture
+Arguments: `$ARGUMENTS`
 
-```
-/sync-docs command (you are here)
-    |
-    v
-sync-docs-agent (sonnet)
-    |-- Invoke sync-docs skill
-    |-- Return structured results
-    |
-    v
-Command processes results
-    |-- If apply mode + fixes: spawn simple-fixer
-    |-- Present final results
-```
+- `report` (default) or `apply`.
+- `--scope=recent` (default: this branch against its base, or the last 5 commits on the base branch), `before-pr`, `all`, or a path.
+- `--base=BRANCH`, `--include-undocumented`: passed through.
 
-## Constraints
+## Run
 
-1. **Preserve existing content** - Update references, don't rewrite sections
-2. **Minimal changes** - Only fix what's actually outdated
-3. **Evidence-based** - Every change linked to a specific code change
-4. **Safe defaults** - Report mode by default
+Spawn `sync-docs:sync-docs-agent` with `Mode`, `Scope`, and the base or path. If Task is not available, read `${CLAUDE_PLUGIN_ROOT}/skills/sync-docs/SKILL.md` and run it inline (not through the Skill tool: `Skill(sync-docs)` resolves to this command). Either way the result ends with a `=== SYNC_DOCS_RESULT ===` block. Its JSON is nested; if you process it as data, parse it as JSON, not with a regex.
 
-## Arguments
+## Apply
 
-Parse from $ARGUMENTS:
+In `apply` mode, apply `fixes` yourself with Edit:
 
-- **Mode**: `report` (default) or `apply`
-- **Scope**:
-  - `--scope=recent` (default): Files changed since last commit to main
-  - `--scope=all`: Scan all docs against all code
-  - `--scope=before-pr`: Files in current branch (for /next-task integration)
-  - `path`: Specific file or directory
+- `replace`: replace `search` with `replace` in `file`. If `search` is gone or occurs more than once, skip the fix and list it as not applied.
+- `changelog-entry`: add `replace` under the named section of the changelog, creating `## [Unreleased]` if needed.
 
-## Execution
+Then commit only the files you edited: `git add -- <files>` and `git commit -m "docs: sync documentation with code changes"`. Other uncommitted work in the tree is the user's and stays out of the commit. Run git hooks.
 
-### Step 1: Parse Arguments
+In `report` mode, edit nothing.
 
-```javascript
-const args = '$ARGUMENTS'.split(' ').filter(Boolean);
-const mode = args.includes('apply') ? 'apply' : 'report';
-const scopeArg = args.find(a => a.startsWith('--scope='));
-const scope = scopeArg ? scopeArg.split('=')[1] : 'recent';
-const pathArg = args.find(a => !a.startsWith('--') && a !== 'report' && a !== 'apply');
-```
-
-### Step 2: Pre-fetch repo-intel doc analysis data
-
-```javascript
-let repoIntelContext = '';
-try {
-  const { binary } = require('@agentsys/lib');
-  const { getStateDirPath } = require('@agentsys/lib/platform/state-dir');
-  const fs = require('fs');
-  const cwd = process.cwd();
-  const mapFile = require('path').join(getStateDirPath(cwd), 'repo-intel.json');
-  const q = (args) => { try { return JSON.parse(binary.runAnalyzer(args)); } catch { return null; } };
-
-  if (fs.existsSync(mapFile)) {
-    // Light pre-fetch so the orchestrator can decide whether to
-    // surface an "analyzer signals available" hint before spawning
-    // the agent. The actual signal consumption happens inside the
-    // skill via lib/collectors/analyzer-queries, which pulls the
-    // full four-query bundle (stale-docs, doc-drift, entry-points,
-    // slop-fixes). We only need presence signals here to avoid
-    // double-fetching the same data into the prompt.
-    const staleDocs = q(['repo-intel', 'query', 'stale-docs', '--top', '30', '--map-file', mapFile, cwd]);
-    const docDrift = q(['repo-intel', 'query', 'doc-drift', '--top', '20', '--map-file', mapFile, cwd]);
-
-    if ((staleDocs && staleDocs.length > 0) || (docDrift && docDrift.length > 0)) {
-      repoIntelContext = '\n\nRepo-intel doc analysis (use this data, do NOT re-scan):';
-
-      if (staleDocs && staleDocs.length > 0) {
-        repoIntelContext += '\n\nStale doc references (symbol-level - highest priority):';
-        staleDocs.forEach(s => {
-          repoIntelContext += `\n  ${s.doc}:${s.line} "${s.reference}" [${s.issue}] ${s.suggestion}`;
-        });
-      }
-
-      if (docDrift && docDrift.length > 0) {
-        const severelyStale = docDrift.filter(d => d.codeCoupling === 0).map(d => d.path);
-        if (severelyStale.length > 0) {
-          repoIntelContext += '\n\nDocs with ZERO code coupling (likely entirely stale): ' + severelyStale.join(', ');
-        }
-      }
-    }
-    // Note: entry-points + slop-fixes (orphan-export,
-    // passthrough-wrapper) are fetched inside the skill via
-    // lib/collectors/analyzer-queries and surfaced in the skill's
-    // JSON output as `undocumentedExports`, `documentsDeadCode`,
-    // and `documentsWrapper`. Not pre-fetched here to avoid
-    // duplicating analyzer calls across the command + skill path.
-  }
-} catch (e) { /* unavailable */ }
-```
-
-### Step 3: Spawn sync-docs-agent
-
-```javascript
-const agentOutput = await Task({
-  subagent_type: "sync-docs:sync-docs-agent",
-  model: "sonnet",
-  prompt: `Sync documentation with code state.
-Mode: ${mode}
-Scope: ${scope}
-${pathArg ? `Path: ${pathArg}` : ''}
-
-Execute the sync-docs skill and return structured results.${repoIntelContext}`
-});
-```
-
-### Step 4: Process Results
-
-Parse the structured JSON from between `=== SYNC_DOCS_RESULT ===` markers:
-
-```javascript
-// Helper to extract JSON result from agent output
-function parseSyncDocsResult(output) {
-  const match = output.match(/=== SYNC_DOCS_RESULT ===[\s\S]*?({[\s\S]*?})[\s\S]*?=== END_RESULT ===/);
-  if (!match) {
-    throw new Error('No SYNC_DOCS_RESULT found in agent output');
-  }
-  return JSON.parse(match[1]);
-}
-
-const result = parseSyncDocsResult(agentOutput);
-// result now contains: { mode, scope, validation, discovery, issues, fixes, changelog, summary }
-```
-
-### Step 5: Apply Fixes (if apply mode)
-
-If mode is `apply` and fixes array is non-empty:
-
-```javascript
-if (mode === 'apply' && result.fixes.length > 0) {
-  await Task({
-    subagent_type: "next-task:simple-fixer",
-    model: "haiku",
-    prompt: `Apply these documentation fixes:
-${JSON.stringify(result.fixes, null, 2)}
-
-Use the Edit tool to apply each fix. Commit message: "docs: sync documentation with code changes"`
-  });
-}
-```
-
-### Step 6: Present Results
+## Report
 
 ```markdown
-## Documentation Sync ${mode === 'apply' ? 'Applied' : 'Report'}
+## Documentation Sync (report|applied)
 
-### Scope
-- Mode: ${mode}
-- Scope: ${scope}
-- Changed files analyzed: ${result.discovery.changedFilesCount}
-- Related docs found: ${result.discovery.relatedDocsCount}
+Range: <discovery.range>, <changedFilesCount> changed files, <relatedDocsCount> related docs
 
-### Validation Results
+### Issues
+- **README.md:42** (high): `parseThing()` was renamed to `parseItem()` in src/api.js
 
-**Count/Version Validation**
-${result.validation.counts.status === 'ok' ? '[OK] Counts and versions aligned' : `[WARN] ${result.validation.counts.summary.issueCount} issues found`}
+### CHANGELOG
+[OK] All changes documented | [WARN] N commits may need entries
 
-**Cross-Platform Validation**
-${result.validation.crossPlatform.status === 'ok' ? '[OK] Cross-platform docs valid' : `[WARN] ${result.validation.crossPlatform.summary.issueCount} issues found`}
-
-### Documentation Issues
-
-${result.issues.length === 0 ? '[OK] No documentation issues detected' :
-  result.issues.map(i => `- **${i.doc}:${i.line || '?'}** (${i.severity}): ${i.suggestion || i.type}`).join('\n')}
-
-### CHANGELOG Status
-
-${result.changelog.status === 'ok' ? '[OK] All changes documented' :
-  `[WARN] ${result.changelog.undocumented.length} commits may need entries:\n${result.changelog.undocumented.map(c => `  - ${c}`).join('\n')}`}
-
-${mode === 'apply' && result.fixes.length > 0 ? `
-### Fixes Applied
-
-${result.fixes.map(f => `- **${f.file}**: ${f.type}`).join('\n')}
-` : ''}
-
-${mode === 'report' && result.fixes.length > 0 ? `
-## Do Next
-
-- [ ] Run \`/sync-docs apply\` to fix ${result.fixes.length} auto-fixable issues
-- [ ] Review flagged items manually
-` : ''}
+### Fixes
+- applied: README.md (replace), CHANGELOG.md (changelog-entry)
+- not applied: docs/api.md, search text not found
 ```
 
-## Examples
+Lead with the highest severity. When `analyzer.available` is false, add one line: `[INFO] repo-intel analysis skipped (<reason>); run /repo-intel for stale-symbol and drift checks.` In report mode with fixes available, end with `Run /sync-docs apply to apply N fixes.`
 
-```bash
-# Check what docs might need updates (safe, no changes)
-/sync-docs
+## Errors
 
-# Check docs related to specific path
-/sync-docs report src/auth/
-
-# Apply safe fixes
-/sync-docs apply
-
-# Full codebase scan
-/sync-docs report --scope=all
-
-# For PR preparation
-/sync-docs apply --scope=before-pr
-```
-
-## Integration
-
-This command is also used by `/next-task` Phase 11:
-
-```javascript
-// Phase 11 invocation
-await Task({
-  subagent_type: "sync-docs:sync-docs-agent",
-  prompt: "Sync docs for PR. Mode: apply, Scope: before-pr"
-});
-```
-
-## Error Handling
-
-- **No git**: Exit with "Git required for change detection"
-- **No changed files**: "No changes detected. Use --scope=all to scan entire codebase"
-- **No docs found**: "No documentation files found"
-- **Agent failure**: Report error, suggest manual review
+- Not a git repository: stop with "Git is required for change detection."
+- No changed files in the scope: say so and suggest `--scope=all`.
+- The result block is missing or not valid JSON: report the failure with the end of the agent's reply. Do not guess fixes.

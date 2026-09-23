@@ -2,6 +2,33 @@
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-09-24
+
+### Changed
+
+- Rewrote the command, agent and skill for current models: goal, judgment rules, constraints with reasons and one output contract, instead of JavaScript for the model to act out.
+- `/sync-docs apply` applies fixes itself and commits only the files it edited. It no longer needs `next-task:simple-fixer`.
+- The "Generate repo-intel?" prompt defaults to skip when AskUserQuestion is missing or the run is unattended. The ast-grep install prompt is gone.
+- `recent` scope diffs the branch against its base (`base...HEAD`); on the base branch it covers the last 5 commits. New `--base=BRANCH`.
+
+### Added
+
+- `scripts/collect.js` gathers the evidence as JSON, with tests (`npm test`).
+
+### Fixed
+
+- The skill described analyzer output (`documentsDeadCode`, `documentsWrapper`, stale-docs issues) that no code produced, and its `allowed-tools` had no `node`, so the collectors it named could not run. `collect.js` produces every field.
+- Removed exports were only detected between `HEAD~1` and `HEAD`, missing anything removed earlier on the branch.
+- CHANGELOG entries naming old symbols were reported as stale docs.
+- A changed dotfile (`.gitmodules`, `.gitignore`) has an empty basename and matched every code example in every doc.
+- The command parsed SYNC_DOCS_RESULT with a lazy regex (`{[\s\S]*?}`) that stops at the first `}`, so any result with nested objects failed.
+- A path scope passed as `--scope=src/api` (the form the prompts document) was ignored: the collector ran the branch diff and labeled it with the path. Found by revuto. Both `--scope=<path>` and a bare path work now.
+- CHANGELOG coverage looked at the last 10 commits on HEAD whatever the scope, so on a short branch it flagged released base-branch commits and apply mode drafted entries for them. It now checks the commits in the scope's range, including conventional scopes like `feat(api):`. Found by revuto.
+- A removed export named like a plain word (`config`) matched every sentence using it, as HIGH certainty. Code mentions are HIGH; prose mentions count only for identifier-shaped names, as MEDIUM. Found by revuto.
+- The agent loaded the skill with `Skill(sync-docs)`, which resolves to the `/sync-docs` command and spawns the agent again. It reads the skill file now.
+- The report printed `validation.counts` and `validation.crossPlatform`, which nothing computed. Dropped.
+
+
 ### Added
 
 - Doc-drift signals from `agent-analyzer` binary: docs with low code-coupling are surfaced as likely stale
