@@ -22,6 +22,7 @@
 - CHANGELOG entries naming old symbols were reported as stale docs.
 - A changed dotfile (`.gitmodules`, `.gitignore`) has an empty basename and matched every code example in every doc.
 - The command parsed SYNC_DOCS_RESULT with a lazy regex (`{[\s\S]*?}`) that stops at the first `}`, so any result with nested objects failed.
+- A path scope passed as `--scope=src/api` (the form the prompts document) was ignored: the collector ran the branch diff and labeled it with the path. Found by revuto. Both `--scope=<path>` and a bare path work now.
 - The report printed `validation.counts` and `validation.crossPlatform`, which nothing computed. Dropped.
 
 

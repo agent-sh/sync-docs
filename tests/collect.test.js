@@ -42,6 +42,21 @@ test('parseArgs reads scope, base, flag and path', () => {
   assert.strictEqual(parseArgs([]).scope, 'recent');
 });
 
+test('a path given as the --scope value is a path scope', () => {
+  const o = parseArgs(['report', '--scope=src']);
+  assert.strictEqual(o.path, 'src');
+  assert.strictEqual(o.scope, 'path');
+  const dir = repo();
+  try {
+    const r = collect(o, dir);
+    assert.strictEqual(r.scope, 'src');
+    assert.strictEqual(r.discovery.range, 'path src');
+    assert.deepStrictEqual(r.discovery.changedFiles, ['src/api.js', 'src/other.js']);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('symbolFromReason takes the first code-formatted name', () => {
   assert.strictEqual(symbolFromReason('exported function `applyFixes` - file has zero importers'), 'applyFixes');
   assert.strictEqual(symbolFromReason('no name here'), null);

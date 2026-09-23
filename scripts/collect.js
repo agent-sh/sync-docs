@@ -33,6 +33,11 @@ function parseArgs(argv) {
     else if (a === 'report' || a === 'apply') opts.mode = a;
     else if (!a.startsWith('--')) opts.path = a;
   }
+  // The prompts document a path as a --scope value too: `--scope=src/api` is a path scope.
+  if (!['recent', 'all', 'before-pr'].includes(opts.scope)) {
+    opts.path = opts.path || opts.scope;
+    opts.scope = 'path';
+  }
   return opts;
 }
 
