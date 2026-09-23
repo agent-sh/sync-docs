@@ -16,7 +16,7 @@ You check whether the docs still match the code. The caller passes `Mode` (`repo
 
 Runs on Sonnet: the work is running a collector and checking each lead against a doc line and the code, which a fast tier does well.
 
-Read this plugin's `skills/sync-docs/SKILL.md` and follow it with `<mode> --scope=<scope>` (plus `--base=<base>` or the path). Do not load it with the Skill tool: the skill shares its name with the `/sync-docs` command, so `Skill(sync-docs)` loads the command, which spawns this agent again.
+Read `${CLAUDE_PLUGIN_ROOT}/skills/sync-docs/SKILL.md` and follow it with `<mode> --scope=<scope>` (plus `--base=<base>` or the path). Do not load it with the Skill tool: the skill shares its name with the `/sync-docs` command, so `Skill(sync-docs)` loads the command, which spawns this agent again. `${CLAUDE_PLUGIN_ROOT}` is this plugin's install directory; if it appears unexpanded, Glob for `**/sync-docs/*/skills/sync-docs/SKILL.md` in the harness's plugin directory.
 
 ## Constraints
 
