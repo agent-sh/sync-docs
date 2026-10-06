@@ -1,7 +1,7 @@
 ---
 name: sync-docs
 description: "Use when the user asks to update docs, sync documentation, fix stale docs or update the changelog, or after code changes that may affect docs. Finds docs that no longer match the code and proposes exact fixes."
-version: 5.2.0
+version: 5.3.0
 argument-hint: "[report|apply] [--scope=all|recent|before-pr] [--base=BRANCH] [--include-undocumented] [path]"
 allowed-tools: Bash(git:*), Bash(node:*), Read, Grep, Glob
 ---
